@@ -6,6 +6,7 @@ import requests
 import nltk
 import unicodedata
 from nltk.tokenize.toktok import ToktokTokenizer
+import spacy
 
 def strip_html_tags(text):
     """
