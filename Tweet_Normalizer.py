@@ -7,6 +7,7 @@ import nltk
 import unicodedata
 from nltk.tokenize.toktok import ToktokTokenizer
 import spacy
+from collections import Counter
 from nltk.corpus import wordnet
 import enchant
 
@@ -410,7 +411,7 @@ def remove_words(text, pattern):
     new_string = re.sub(r"\b(%s)\b" % "|".join(pattern), "", text, flags=re.I)
     return new_string
 
-def tweet_scruber(df, drop_columns = True, normalize = True, remove_invalid = True, drop_missing=True, verbose=False):
+def tweet_scrubber(df, drop_columns = True, normalize = True, remove_invalid = True, verbose=False):
     """
     This function is a wrapper over the various functions used to clean the Twitter data.
     
@@ -422,7 +423,10 @@ def tweet_scruber(df, drop_columns = True, normalize = True, remove_invalid = Tr
     verbose: Boolean to determine if progress should be printed
     """
     
-    if verbose: print("Running tweet scruber...\n")
+    if verbose: print("Running tweet scrubber...\n")
+        
+    stopword_list.remove("no")
+    stopword_list.remove("not")
     
     if drop_columns:
         if verbose: print("Dropping unnecessary columns")
@@ -435,14 +439,15 @@ def tweet_scruber(df, drop_columns = True, normalize = True, remove_invalid = Tr
         if verbose: print("Successfully normalized tweets!\n")
             
     if remove_invalid:
-        if verbose: print("Removing invaled and mispelled words")
+        if verbose: print("Removing invalid and mispelled words")
         bad_words_list = make_pattern(df)
         df["Clean Tweets"] = df["Clean Tweets"].apply(remove_words, pattern = bad_words_list)
         if verbose: print("Successfully removed invalid and mispelled words!\n")
-            
-    if drop_missing:
-        if verbose: print("Dropping tweets with no words")
-        df = df.dropna(subset=["Clean Tweets"])
-        if verbose: print("Successfully dropped tweets!")
+
+    if verbose: print("Successfully scrubbed tweets!\n")
         
     return df
+    
+    
+    
+    
