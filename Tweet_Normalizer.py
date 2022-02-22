@@ -7,6 +7,8 @@ import nltk
 import unicodedata
 from nltk.tokenize.toktok import ToktokTokenizer
 import spacy
+from nltk.corpus import wordnet
+import enchant
 
 def strip_html_tags(text):
     """
@@ -351,3 +353,96 @@ def normalize_corpus(corpus, html_stripping = True, contraction_expansion = True
         normalized_corpus.append(doc)
         
     return normalized_corpus
+
+spell_checker = enchant.Dict("en_US")
+
+def valid_word(text):
+    """
+    This function returns a boolean value on if it exists in the wordnet corpus and if it is spelled correctly.
+    
+    text: Word to check
+    
+    returns: correct_word: boolean 
+    """
+    correct_word = (len(wordnet.synsets(text)) != 0 & spell_checker.check(text))
+    return correct_word
+
+def make_pattern(df):
+    """
+    This function makes the pattern of words based on if they are valid.
+    
+    df: Dataframe with the required columns.
+    
+    returns: bad_words_list containing a list of all the words to remove
+    """
+    
+    # Create a list of all words used in safe tweets
+    words = [word for row in df["Clean Tweets"] for word in row.split()]
+    # Create a counter to count the words
+    word_cnt = Counter(words)
+    # Create a dictionary of the words
+    word_dict = dict(word_cnt.most_common())
+    # Create a dataframe with words and their count
+    word_df = pd.DataFrame({"Word": word_dict.keys(), "Count": word_dict.values()})
+    # Create a new column with the word percentage
+    word_df["Percentage"] = (word_df["Count"] / len(words)) * 100
+    # Create a new column with a flag for valid words
+    word_df["Valid Word"] = word_df["Word"].apply(valid_word)
+    # Create a list of words that are invalid
+    bad_words_list = list(word_df.loc[(word_df["Valid Word"] == False), "Word"])
+    
+    #This is special situation that has to be hardcoded. A explict "\" has to be added to escape the "["
+    bad_words_list.index("famine[")
+    bad_words_list[bad_words_list.index("famine[")] = "famine\["
+    
+    return bad_words_list
+
+def remove_words(text, pattern):
+    """
+    This function removes words based on those found in the pattern.
+    
+    test: String of text
+    pattern: List of words to remove
+    
+    returns: new string with specified words removed
+    """
+
+    new_string = re.sub(r"\b(%s)\b" % "|".join(pattern), "", text, flags=re.I)
+    return new_string
+
+def tweet_scruber(df, drop_columns = True, normalize = True, remove_invalid = True, drop_missing=True, verbose=False):
+    """
+    This function is a wrapper over the various functions used to clean the Twitter data.
+    
+    df: DataFrame with the necessary columns
+    drop_columns: Boolean to determine if unnecessary columns should be dropped
+    normalize: Boolean to determine if tweets should be normalized
+    remove_invalid: Boolean to determine if invalid words in tweets should be removed
+    drop_missing: Boolean to determine if missing rows after normalizing and removing invalid words should be dropped
+    verbose: Boolean to determine if progress should be printed
+    """
+    
+    if verbose: print("Running tweet scruber...\n")
+    
+    if drop_columns:
+        if verbose: print("Dropping unnecessary columns")
+        df = df.drop(["id", "keyword", "location"], axis = 1)
+        if verbose: print("Successfully dropped columns!\n")
+            
+    if normalize:
+        if verbose: print("Normalizing the tweets")
+        df["Clean Tweets"] = np.array(normalize_corpus(df["text"]))
+        if verbose: print("Successfully normalized tweets!\n")
+            
+    if remove_invalid:
+        if verbose: print("Removing invaled and mispelled words")
+        bad_words_list = make_pattern(df)
+        df["Clean Tweets"] = df["Clean Tweets"].apply(remove_words, pattern = bad_words_list)
+        if verbose: print("Successfully removed invalid and mispelled words!\n")
+            
+    if drop_missing:
+        if verbose: print("Dropping tweets with no words")
+        df = df.dropna(subset=["Clean Tweets"])
+        if verbose: print("Successfully dropped tweets!")
+        
+    return df
