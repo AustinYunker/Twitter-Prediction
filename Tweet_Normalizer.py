@@ -368,7 +368,7 @@ def valid_word(text):
     correct_word = (len(wordnet.synsets(text)) != 0 & spell_checker.check(text))
     return correct_word
 
-def make_pattern(df):
+def make_pattern(df, train = True):
     """
     This function makes the pattern of words based on if they are valid.
     
@@ -393,8 +393,9 @@ def make_pattern(df):
     bad_words_list = list(word_df.loc[(word_df["Valid Word"] == False), "Word"])
     
     #This is special situation that has to be hardcoded. A explict "\" has to be added to escape the "["
-    bad_words_list.index("famine[")
-    bad_words_list[bad_words_list.index("famine[")] = "famine\["
+    if train:
+        bad_words_list.index("famine[")
+        bad_words_list[bad_words_list.index("famine[")] = "famine\["
     
     return bad_words_list
 
@@ -411,7 +412,7 @@ def remove_words(text, pattern):
     new_string = re.sub(r"\b(%s)\b" % "|".join(pattern), "", text, flags=re.I)
     return new_string
 
-def tweet_scrubber(df, drop_columns = True, normalize = True, remove_invalid = True, verbose=False):
+def tweet_scrubber(df, drop_columns = True, normalize = True, remove_invalid = True, verbose=False, train = True):
     """
     This function is a wrapper over the various functions used to clean the Twitter data.
     
@@ -440,11 +441,13 @@ def tweet_scrubber(df, drop_columns = True, normalize = True, remove_invalid = T
             
     if remove_invalid:
         if verbose: print("Removing invalid and mispelled words")
-        bad_words_list = make_pattern(df)
+        bad_words_list = make_pattern(df, train = train)
         df["Clean Tweets"] = df["Clean Tweets"].apply(remove_words, pattern = bad_words_list)
         if verbose: print("Successfully removed invalid and mispelled words!\n")
 
     if verbose: print("Successfully scrubbed tweets!\n")
+    stopword_list.append("no")
+    stopword_list.append("not")
         
     return df
     
